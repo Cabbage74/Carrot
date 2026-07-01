@@ -1,0 +1,22 @@
+# Python 字节码
+__pycache__/
+*.py[cod]
+*.so
+
+# uv 虚拟环境
+.venv/
+
+# 构建产物
+dist/
+*.egg-info/
+
+# IDE
+.vscode/
+.idea/
+
+# macOS
+.DS_Store
+
+# AI 相关
+.claude/
+.codex/
