@@ -20,3 +20,6 @@ dist/
 # AI 相关
 .claude/
 .codex/
+
+# key
+.env
