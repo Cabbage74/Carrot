@@ -47,8 +47,10 @@ if __name__ == "__main__":
         client = OpenAICompatibleClient()
         messages = [
             {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": "1+1=?"}
+            {"role": "user", "content": "1 + 1 = ?"}
         ]
-        client.respond(messages)
+        response = client.respond(messages)
+        print(response.content)
+        print(response.tool_calls)
     except Exception as e:
         print(f"Error initializing client: {e}")
