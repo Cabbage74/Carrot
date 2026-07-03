@@ -1,6 +1,8 @@
 import os
+import json
 from openai import OpenAI
 from dotenv import load_dotenv
+from message import Response, ToolCall
 
 load_dotenv()
 
@@ -15,24 +17,25 @@ class OpenAICompatibleClient:
         except Exception as e:
             raise ValueError(f"Failed to initialize OpenAI client: {e}")
     
-    def respond(self, messages: list[dict[str, str]], temperature: float = 0) -> str:
+    def respond(self, messages: list[dict[str, str]], tools: list = None, temperature: float = 0) -> Response:
         try:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                temperature=temperature,
-                stream=True,    
-            )
+            kwargs = dict(model=self.model, messages=messages, temperature=temperature)
+            if tools:
+                kwargs["tools"] = tools
+            response = self.client.chat.completions.create(**kwargs)
+            message = response.choices[0].message
 
-            collected_content = []
-            for chunk in response:
-                if not chunk.choices:
-                    continue
-                content = chunk.choices[0].delta.content or ""
-                print(content, end="", flush=True)
-                collected_content.append(content)
-            print()
-            return "".join(collected_content)
+            tool_calls = []
+            if message.tool_calls:
+                for tc in message.tool_calls:
+                    tool_calls.append(ToolCall(
+                        id=tc.id,
+                        name=tc.function.name,
+                        arguments=json.loads(tc.function.arguments)
+                    ))
+
+            return Response(content=message.content, tool_calls=tool_calls)
+            
         except Exception as e:
             print(f"Error during think: {e}")
             return None

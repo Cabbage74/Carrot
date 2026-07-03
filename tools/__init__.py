@@ -1,3 +1,7 @@
+import importlib
+import pkgutil
+import tools as _pkg
+
 class Toolbox:
     def __init__(self):
         self._tools: dict[str, dict] = {}
@@ -39,3 +43,7 @@ def tool(name: str, description: str, parameters: dict):
         toolbox.register(name, description, parameters, func)
         return func
     return wrapper
+
+
+for _, module_name, _ in pkgutil.iter_modules(_pkg.__path__):
+    importlib.import_module(f"tools.{module_name}")
