@@ -1,5 +1,6 @@
 import os
-from tools import tool
+from . import tool
+
 
 @tool(
     name="read_file",
@@ -9,11 +10,11 @@ from tools import tool
         "properties": {
             "file_path": {
                 "type": "string",
-                "description": "The path to the file to read."
+                "description": "The path to the file to read.",
             }
         },
-        "required": ["file_path"]
-    }
+        "required": ["file_path"],
+    },
 )
 def read_file(file_path: str):
     if not os.path.exists(file_path):

@@ -1,6 +1,7 @@
 import json
 from dataclasses import dataclass, field
 
+
 @dataclass
 class ToolCall:
     id: str
@@ -11,10 +12,7 @@ class ToolCall:
         return {
             "id": self.id,
             "type": "function",
-            "function": {
-                "name": self.name,
-                "arguments": json.dumps(self.arguments)
-            }            
+            "function": {"name": self.name, "arguments": json.dumps(self.arguments)},
         }
 
 
@@ -25,4 +23,3 @@ class Response:
 
     def has_tool_calls(self) -> bool:
         return len(self.tool_calls) > 0
-    

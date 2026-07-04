@@ -2,12 +2,19 @@ import os
 import json
 from openai import OpenAI
 from dotenv import load_dotenv
-from message import Response, ToolCall
+from .message import Response, ToolCall
 
 load_dotenv()
 
+
 class OpenAICompatibleClient:
-    def __init__(self, api_key: str = None, model: str = None, base_url: str = None, timeout: int = None):
+    def __init__(
+        self,
+        api_key: str = None,
+        model: str = None,
+        base_url: str = None,
+        timeout: int = None,
+    ):
         self.api_key = api_key or os.getenv("OPENAI_API_KEY")
         self.model = model or os.getenv("OPENAI_MODEL")
         self.base_url = base_url or os.getenv("OPENAI_BASE_URL")
@@ -16,8 +23,10 @@ class OpenAICompatibleClient:
             self.client = OpenAI(api_key=self.api_key, base_url=self.base_url, timeout=self.timeout)
         except Exception as e:
             raise ValueError(f"Failed to initialize OpenAI client: {e}")
-    
-    def respond(self, messages: list[dict[str, str]], tools: list = None, temperature: float = 0) -> Response:
+
+    def respond(
+        self, messages: list[dict[str, str]], tools: list = None, temperature: float = 0
+    ) -> Response:
         try:
             kwargs = dict(model=self.model, messages=messages, temperature=temperature)
             if tools:
@@ -28,18 +37,19 @@ class OpenAICompatibleClient:
             tool_calls = []
             if message.tool_calls:
                 for tc in message.tool_calls:
-                    tool_calls.append(ToolCall(
-                        id=tc.id,
-                        name=tc.function.name,
-                        arguments=json.loads(tc.function.arguments)
-                    ))
+                    tool_calls.append(
+                        ToolCall(
+                            id=tc.id,
+                            name=tc.function.name,
+                            arguments=json.loads(tc.function.arguments),
+                        )
+                    )
 
             return Response(content=message.content, tool_calls=tool_calls)
-            
+
         except Exception as e:
             print(f"Error during think: {e}")
             return None
-        
 
 
 if __name__ == "__main__":
@@ -47,7 +57,7 @@ if __name__ == "__main__":
         client = OpenAICompatibleClient()
         messages = [
             {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": "1 + 1 = ?"}
+            {"role": "user", "content": "1 + 1 = ?"},
         ]
         response = client.respond(messages)
         print(response.content)

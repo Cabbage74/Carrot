@@ -1,6 +1,6 @@
 import importlib
 import pkgutil
-import tools as _pkg
+
 
 class Toolbox:
     def __init__(self):
@@ -11,7 +11,7 @@ class Toolbox:
             "name": name,
             "description": description,
             "parameters": parameters,
-            "func": func
+            "func": func,
         }
 
     def execute(self, name: str, arguments: dict) -> str:
@@ -21,7 +21,6 @@ class Toolbox:
             return str(result)
         except Exception as e:
             return f"Error: {e}"
-        
 
     def get_openai_schema(self) -> list[dict]:
         return [
@@ -31,19 +30,22 @@ class Toolbox:
                     "name": tool["name"],
                     "description": tool["description"],
                     "parameters": tool["parameters"],
-                }
+                },
             }
             for tool in self._tools.values()
         ]
-    
+
+
 toolbox = Toolbox()
+
 
 def tool(name: str, description: str, parameters: dict):
     def wrapper(func):
         toolbox.register(name, description, parameters, func)
         return func
+
     return wrapper
 
 
-for _, module_name, _ in pkgutil.iter_modules(_pkg.__path__):
-    importlib.import_module(f"tools.{module_name}")
+for _, module_name, _ in pkgutil.iter_modules(__path__):
+    importlib.import_module(f".{module_name}", package="carrot.tools")
