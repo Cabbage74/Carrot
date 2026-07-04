@@ -50,6 +50,14 @@ class OpenAICompatibleClient:
         except Exception as e:
             print(f"Error during think: {e}")
             return None
+        
+    def respond_stream(self, messages: list[dict[str, str]], tools: list = None, temperature: float = 0):
+        kwargs = dict(model=self.model, messages=messages, temperature=temperature, stream=True)
+        if tools:
+            kwargs["tools"] = tools
+        stream = self.client.chat.completions.create(**kwargs)
+        for chunk in stream:
+            yield chunk
 
 
 if __name__ == "__main__":
