@@ -1,6 +1,6 @@
 import os
 import json
-from openai import OpenAI
+from openai import NOT_GIVEN, OpenAI
 from dotenv import load_dotenv
 from .message import Response, ToolCall
 
@@ -10,10 +10,10 @@ load_dotenv()
 class OpenAICompatibleClient:
     def __init__(
         self,
-        api_key: str = None,
-        model: str = None,
-        base_url: str = None,
-        timeout: int = None,
+        api_key: str | None = None,
+        model: str | None = None,
+        base_url: str | None = None,
+        timeout: int | None = None,
     ):
         self.api_key = api_key or os.getenv("OPENAI_API_KEY")
         self.model = model or os.getenv("OPENAI_MODEL")
@@ -24,51 +24,16 @@ class OpenAICompatibleClient:
         except Exception as e:
             raise ValueError(f"Failed to initialize OpenAI client: {e}")
 
-    def respond(
-        self, messages: list[dict[str, str]], tools: list = None, temperature: float = 0
-    ) -> Response:
-        try:
-            kwargs = dict(model=self.model, messages=messages, temperature=temperature)
-            if tools:
-                kwargs["tools"] = tools
-            response = self.client.chat.completions.create(**kwargs)
-            message = response.choices[0].message
-
-            tool_calls = []
-            if message.tool_calls:
-                for tc in message.tool_calls:
-                    tool_calls.append(
-                        ToolCall(
-                            id=tc.id,
-                            name=tc.function.name,
-                            arguments=json.loads(tc.function.arguments),
-                        )
-                    )
-
-            return Response(content=message.content, tool_calls=tool_calls)
-
-        except Exception as e:
-            print(f"Error during think: {e}")
-            return None
-        
-    def respond_stream(self, messages: list[dict[str, str]], tools: list = None, temperature: float = 0):
-        kwargs = dict(model=self.model, messages=messages, temperature=temperature, stream=True)
-        if tools:
-            kwargs["tools"] = tools
-        stream = self.client.chat.completions.create(**kwargs)
+    
+    def respond_stream(self, messages: list[dict[str, str]], tools: list | None = None, temperature: float = 0):
+        if self.model is None:
+            raise ValueError("Model not configured")
+        stream = self.client.chat.completions.create(
+            model=self.model,
+            messages=messages,  # type: ignore[arg-type]
+            temperature=temperature,
+            stream=True,
+            tools=tools if tools is not None else NOT_GIVEN, # type: ignore[arg-type]
+        )
         for chunk in stream:
             yield chunk
-
-
-if __name__ == "__main__":
-    try:
-        client = OpenAICompatibleClient()
-        messages = [
-            {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": "1 + 1 = ?"},
-        ]
-        response = client.respond(messages)
-        print(response.content)
-        print(response.tool_calls)
-    except Exception as e:
-        print(f"Error initializing client: {e}")

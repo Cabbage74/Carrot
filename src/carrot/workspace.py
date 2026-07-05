@@ -95,7 +95,8 @@ class WorkspaceContext:
             f"- default_branch: {self.default_branch}",
             "- status:",
         ])
-        lines.append(textwrap.indent(self.status, "  ") or "  (clean)")
+        if self.status: 
+            lines.append(textwrap.indent(self.status, "  ") or "  (clean)")
 
         lines.append("- recent_commits:")
         if self.recent_commits:

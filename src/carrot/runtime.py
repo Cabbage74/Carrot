@@ -51,7 +51,7 @@ class Runtime:
                             if tc_delta.function.arguments:
                                 acc.arguments += tc_delta.function.arguments
 
-            tool_calls = [a.finalize() for a in tool_call_accums.values() if a.finalize()]
+            tool_calls = [tc for a in tool_call_accums.values() if (tc := a.finalize())]
             
             if not tool_calls:
                 return content
