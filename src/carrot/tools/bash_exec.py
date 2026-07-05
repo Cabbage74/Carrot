@@ -1,5 +1,7 @@
 import subprocess
+
 from . import tool
+
 
 @tool(
     name="bash_exec",
@@ -34,6 +36,6 @@ def bash_exec(command: str, timeout: int = 120):
         if result.returncode != 0:
             out += f"\n[exit code: {result.returncode}]"
         return out or "(no output)"
-    
+
     except subprocess.TimeoutExpired:
         return f"Error: Command timed out after {timeout}s"

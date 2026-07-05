@@ -1,4 +1,5 @@
 import os
+
 from . import tool
 
 
@@ -19,5 +20,5 @@ from . import tool
 def read_file(file_path: str):
     if not os.path.exists(file_path):
         raise FileNotFoundError("File not found.")
-    with open(file_path, "r") as f:
+    with open(file_path) as f:
         return f.read()

@@ -1,7 +1,7 @@
 from .client import OpenAICompatibleClient
-from .workspace import WorkspaceContext
-from .runtime import Runtime
 from .prompts import system_prompt_prefix
+from .runtime import Runtime
+from .workspace import WorkspaceContext
 
 
 def main():
@@ -9,7 +9,7 @@ def main():
     workspace_context = WorkspaceContext.build()
 
     runtime = Runtime.build(client, workspace_context, system_prompt_prefix=system_prompt_prefix)
-    
+
     print("Carrot REPL — /exit to quit\n")
     while True:
         try:
@@ -20,14 +20,13 @@ def main():
 
         if not user_input:
             continue
-    
+
         if user_input == "/exit":
             print("Bye!")
             break
 
         runtime.run(user_input)
         print()
-
 
 
 if __name__ == "__main__":

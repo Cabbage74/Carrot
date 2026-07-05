@@ -15,6 +15,7 @@ class ToolCall:
             "function": {"name": self.name, "arguments": json.dumps(self.arguments)},
         }
 
+
 @dataclass
 class StreamingToolCallAccumulator:
     index: int
@@ -26,6 +27,7 @@ class StreamingToolCallAccumulator:
         if self.id and self.name:
             return ToolCall(id=self.id, name=self.name, arguments=json.loads(self.arguments))
         return None
+
 
 @dataclass
 class Response:

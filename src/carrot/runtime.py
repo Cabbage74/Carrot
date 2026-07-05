@@ -1,8 +1,9 @@
 from .client import OpenAICompatibleClient
-from .tools import toolbox
-from .message import StreamingToolCallAccumulator
-from .workspace import WorkspaceContext
 from .log import logger
+from .message import StreamingToolCallAccumulator
+from .tools import toolbox
+from .workspace import WorkspaceContext
+
 
 class Runtime:
     def __init__(self, client, workspace_context, system_prompt_prefix, messages):
@@ -12,16 +13,21 @@ class Runtime:
         self.messages = messages
 
     @classmethod
-    def build(cls, client: OpenAICompatibleClient, workspace_context: WorkspaceContext, system_prompt_prefix: str):
+    def build(
+        cls,
+        client: OpenAICompatibleClient,
+        workspace_context: WorkspaceContext,
+        system_prompt_prefix: str,
+    ):
         system_prompt = system_prompt_prefix + "\n\n"
         system_prompt += workspace_context.text()
         logger.debug("System prompt:\n%s", system_prompt)
-        
+
         return cls(
             client=client,
             workspace_context=workspace_context,
             system_prompt_prefix=system_prompt_prefix,
-            messages=[{"role": "system", "content": system_prompt}]
+            messages=[{"role": "system", "content": system_prompt}],
         )
 
     def run(self, user_input: str) -> str:
@@ -30,7 +36,9 @@ class Runtime:
         while True:
             content = ""
             tool_call_accums: dict[int, StreamingToolCallAccumulator] = {}
-            for chunk in self.client.respond_stream(self.messages, tools=toolbox.get_openai_schema()):
+            for chunk in self.client.respond_stream(
+                self.messages, tools=toolbox.get_openai_schema()
+            ):
                 delta = chunk.choices[0].delta
 
                 if delta.content:
@@ -52,7 +60,7 @@ class Runtime:
                                 acc.arguments += tc_delta.function.arguments
 
             tool_calls = [tc for a in tool_call_accums.values() if (tc := a.finalize())]
-            
+
             if not tool_calls:
                 return content
 

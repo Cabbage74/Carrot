@@ -1,5 +1,7 @@
 import os
+
 from . import tool
+
 
 @tool(
     name="edit_file",
@@ -26,7 +28,7 @@ from . import tool
 def edit_file(file_path: str, old_string: str, new_string: str):
     if not os.path.exists(file_path):
         raise FileNotFoundError("File not found.")
-    with open(file_path, "r") as f:
+    with open(file_path) as f:
         content = f.read()
         count = content.count(old_string)
         if count == 0:

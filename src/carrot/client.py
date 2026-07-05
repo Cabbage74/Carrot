@@ -1,8 +1,7 @@
 import os
-import json
-from openai import NOT_GIVEN, OpenAI
+
 from dotenv import load_dotenv
-from .message import Response, ToolCall
+from openai import NOT_GIVEN, OpenAI
 
 load_dotenv()
 
@@ -24,8 +23,9 @@ class OpenAICompatibleClient:
         except Exception as e:
             raise ValueError(f"Failed to initialize OpenAI client: {e}")
 
-    
-    def respond_stream(self, messages: list[dict[str, str]], tools: list | None = None, temperature: float = 0):
+    def respond_stream(
+        self, messages: list[dict[str, str]], tools: list | None = None, temperature: float = 0
+    ):
         if self.model is None:
             raise ValueError("Model not configured")
         stream = self.client.chat.completions.create(
@@ -33,7 +33,7 @@ class OpenAICompatibleClient:
             messages=messages,  # type: ignore[arg-type]
             temperature=temperature,
             stream=True,
-            tools=tools if tools is not None else NOT_GIVEN, # type: ignore[arg-type]
+            tools=tools if tools is not None else NOT_GIVEN,  # type: ignore[arg-type]
         )
         for chunk in stream:
             yield chunk

@@ -1,14 +1,23 @@
-from dataclasses import dataclass
 import subprocess
 import textwrap
+from dataclasses import dataclass
 from pathlib import Path
 
-IMPORTANT_FILES = ["CARROT.md", "README.md", "pyproject.toml", "go.mod", "Cargo.toml", "package.json"]
+IMPORTANT_FILES = [
+    "CARROT.md",
+    "README.md",
+    "pyproject.toml",
+    "go.mod",
+    "Cargo.toml",
+    "package.json",
+]
+
 
 def _clip(text: str, limit: int = 1500) -> str:
     if len(text) <= limit:
         return text
     return text[:limit] + f"\n...[truncated {len(text) - limit} chars]"
+
 
 @dataclass
 class WorkspaceContext:
@@ -28,14 +37,17 @@ class WorkspaceContext:
         def git(args, fallback=""):
             try:
                 result = subprocess.run(
-                    ["git", *args], cwd=cwd,
-                    capture_output=True, text=True,
-                    check=True, timeout=5,
+                    ["git", *args],
+                    cwd=cwd,
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                    timeout=5,
                 )
                 return result.stdout.strip() or fallback
             except Exception:
                 return fallback
-     
+
         is_git_repo = git(["rev-parse", "--is-inside-work-tree"]) == "true"
         if not is_git_repo:
             return cls(
@@ -48,19 +60,17 @@ class WorkspaceContext:
                 recent_commits=None,
                 important_files=None,
             )
-        
+
         repo_root = Path(git(["rev-parse", "--show-toplevel"], str(cwd))).resolve()
-        
+
         files = {}
         for name in IMPORTANT_FILES:
             path = repo_root / name
             if not path.exists():
                 continue
             key = str(path.relative_to(repo_root))
-            files[key] = _clip(
-                path.read_text(encoding="utf-8", errors="replace")
-            )
-        
+            files[key] = _clip(path.read_text(encoding="utf-8", errors="replace"))
+
         remotes = git(["remote"]).splitlines()
         remote = "origin" if "origin" in remotes else (remotes[0] if remotes else "origin")
         default_branch = git(
@@ -74,10 +84,8 @@ class WorkspaceContext:
             current_branch=git(["branch", "--show-current"], "unknown"),
             default_branch=default_branch,
             status=_clip(git(["status", "--short"])) or "clean",
-            recent_commits=[
-                line for line in git(["log", "--oneline", "-5"]).splitlines() if line
-            ],
-            important_files=files
+            recent_commits=[line for line in git(["log", "--oneline", "-5"]).splitlines() if line],
+            important_files=files,
         )
 
     def text(self) -> str:
@@ -90,12 +98,14 @@ class WorkspaceContext:
         if not self.is_git_repo:
             return "\n".join(lines)
 
-        lines.extend([
-            f"- current_branch: {self.current_branch}",
-            f"- default_branch: {self.default_branch}",
-            "- status:",
-        ])
-        if self.status: 
+        lines.extend(
+            [
+                f"- current_branch: {self.current_branch}",
+                f"- default_branch: {self.default_branch}",
+                "- status:",
+            ]
+        )
+        if self.status:
             lines.append(textwrap.indent(self.status, "  ") or "  (clean)")
 
         lines.append("- recent_commits:")
