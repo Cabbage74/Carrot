@@ -1,12 +1,16 @@
 from .client import OpenAICompatibleClient
+from .workspace import WorkspaceContext
 from .runtime import Runtime
+from .prompts import system_prompt_prefix
 
 
 def main():
     client = OpenAICompatibleClient()
-    runtime = Runtime(client, system_prompt="You are a helpful coding agent.")
+    workspace_context = WorkspaceContext.build()
+
+    runtime = Runtime.build(client, workspace_context, system_prompt_prefix=system_prompt_prefix)
     
-    print("Carrot REPL — /exit to quit, /clear to reset\n")
+    print("Carrot REPL — /exit to quit\n")
     while True:
         try:
             user_input = input("> ").strip()
@@ -20,11 +24,6 @@ def main():
         if user_input == "/exit":
             print("Bye!")
             break
-
-        if user_input == "/clear":
-            runtime.messages = [runtime.messages[0]]
-            print("[history cleared]")
-            continue
 
         runtime.run(user_input)
         print()

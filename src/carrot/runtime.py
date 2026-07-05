@@ -1,12 +1,28 @@
 from .client import OpenAICompatibleClient
 from .tools import toolbox
 from .message import StreamingToolCallAccumulator
-
+from .workspace import WorkspaceContext
+from .log import logger
 
 class Runtime:
-    def __init__(self, client: OpenAICompatibleClient, system_prompt: str):
+    def __init__(self, client, workspace_context, system_prompt_prefix, messages):
         self.client = client
-        self.messages = [{"role": "system", "content": system_prompt}]
+        self.workspace_context = workspace_context
+        self.system_prompt_prefix = system_prompt_prefix
+        self.messages = messages
+
+    @classmethod
+    def build(cls, client: OpenAICompatibleClient, workspace_context: WorkspaceContext, system_prompt_prefix: str):
+        system_prompt = system_prompt_prefix + "\n\n"
+        system_prompt += workspace_context.text()
+        logger.debug("System prompt:\n%s", system_prompt)
+        
+        return cls(
+            client=client,
+            workspace_context=workspace_context,
+            system_prompt_prefix=system_prompt_prefix,
+            messages=[{"role": "system", "content": system_prompt}]
+        )
 
     def run(self, user_input: str) -> str:
         self.messages.append({"role": "user", "content": user_input})
