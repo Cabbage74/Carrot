@@ -18,10 +18,6 @@ dist/
 # macOS
 .DS_Store
 
-# AI 相关
-.claude/
-.codex/
-
 # key
 .env
 

@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:www.firecrawl.dev)",
+      "WebFetch(domain:github.com)",
+      "Bash(ls /home/cabbage/Carrot/.claude/ 2>/dev/null && echo \"---\" && ls /home/cabbage/.claude/ 2>/dev/null)",
+      "Read(//home/cabbage/.claude/**)",
+      "Bash(mkdir -p /home/cabbage/Carrot/.claude/skills)"
+    ],
+    "additionalDirectories": [
+      "/home/cabbage/Carrot/.claude"
+    ]
+  }
+}
