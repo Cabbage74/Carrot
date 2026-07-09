@@ -5,7 +5,10 @@ from . import tool
 
 @tool(
     name="edit_file",
-    description="Perform exact string replacement in a file. The old_string must match exactly, including whitespace.",
+    description=(
+        "Perform exact string replacement in a file. "
+        "The old_string must match exactly, including whitespace."
+    ),
     parameters={
         "type": "object",
         "properties": {

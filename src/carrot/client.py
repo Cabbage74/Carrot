@@ -35,5 +35,4 @@ class OpenAICompatibleClient:
             stream=True,
             tools=tools if tools is not None else NOT_GIVEN,  # type: ignore[arg-type]
         )
-        for chunk in stream:
-            yield chunk
+        yield from stream

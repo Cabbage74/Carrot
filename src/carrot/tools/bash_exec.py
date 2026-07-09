@@ -5,7 +5,10 @@ from . import tool
 
 @tool(
     name="bash_exec",
-    description="Execute a shell command and return its stdout and stderr. Use a timeout to prevent hanging.",
+    description=(
+        "Execute a shell command and return its stdout and stderr. "
+        "Use a timeout to prevent hanging."
+    ),
     parameters={
         "type": "object",
         "properties": {

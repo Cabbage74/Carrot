@@ -5,7 +5,10 @@ from . import tool
 
 @tool(
     name="write_file",
-    description="Write content to a file, overwriting if it exists. Creates parent directories if needed.",
+    description=(
+        "Write content to a file, overwriting if it exists. "
+        "Creates parent directories if needed."
+    ),
     parameters={
         "type": "object",
         "properties": {
