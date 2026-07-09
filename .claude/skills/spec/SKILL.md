@@ -1,3 +1,13 @@
+---
+name: spec
+description: Feature specification skill — guides through functional spec, technical design, and code examples. Use when the user types /spec or wants to design a feature before writing code.
+user-invocable: true
+allowed-tools:
+  - Read
+  - Bash(find *)
+  - Bash(grep *)
+---
+
 # /spec — Feature Specification Skill
 
 Use this skill when the user wants to discuss and design a feature before writing code.
