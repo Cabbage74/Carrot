@@ -10,6 +10,7 @@ from .memory import set_current as set_current_memory
 from .message import StreamingToolCallAccumulator
 from .tools import toolbox
 from .workspace import WorkspaceContext
+from .context_governor import ContextGovernor
 
 REMINDER_THRESHOLD = 5
 REMINDER_TEXT = (
@@ -18,12 +19,13 @@ REMINDER_TEXT = (
 )
 
 class Runtime:
-    def __init__(self, client, workspace_context, system_prompt_prefix, messages, session_id):
+    def __init__(self, client, workspace_context, system_prompt_prefix, messages, session_id, context_governor):
         self.client = client
         self.workspace_context = workspace_context
         self.system_prompt_prefix = system_prompt_prefix
         self.messages = messages
         self.session_id = session_id
+        self.context_governor = context_governor
 
     @classmethod
     def build(
@@ -52,6 +54,7 @@ class Runtime:
                 {"role": "system", "content": memory_snapshot}
             ],
             session_id=session_id,
+            context_governor=ContextGovernor()
         )
 
     def run(self, user_input: str) -> str:
@@ -69,11 +72,20 @@ class Runtime:
                 self.messages.append({"role": "system", "content": REMINDER_TEXT})
                 mem.tool_calls_since_update = 0
 
+            self.context_governor.check_and_apply(self.messages, self.client)
+
+            usage = None
             content = ""
             tool_call_accums: dict[int, StreamingToolCallAccumulator] = {}
             for chunk in self.client.respond_stream(
                 self.messages, tools=toolbox.get_openai_schema()
             ):
+                if getattr(chunk, "usage", None):
+                    usage = chunk.usage
+                
+                if not chunk.choices:
+                    continue
+
                 delta = chunk.choices[0].delta
 
                 if delta.content:
@@ -93,6 +105,8 @@ class Runtime:
                                 acc.name = tc_delta.function.name
                             if tc_delta.function.arguments:
                                 acc.arguments += tc_delta.function.arguments
+
+            self.context_governor.record_usage(usage, len(self.messages))
 
             tool_calls = [tc for a in tool_call_accums.values() if (tc := a.finalize())]
 

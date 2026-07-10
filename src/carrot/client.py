@@ -33,6 +33,7 @@ class OpenAICompatibleClient:
             messages=messages,  # type: ignore[arg-type]
             temperature=temperature,
             stream=True,
+            stream_options={"include_usage": True},
             tools=tools if tools is not None else NOT_GIVEN,  # type: ignore[arg-type]
         )
         yield from stream
