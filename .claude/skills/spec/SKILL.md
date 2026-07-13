@@ -16,6 +16,13 @@ Use this skill when the user wants to discuss and design a feature before writin
 
 Invoked via `/spec [feature description]`. The user has already described what they want to build.
 
+## Reference Standard: Claude Code
+
+Carrot is not a toy project — for every feature, prefer learning from and aligning with Claude Code's own shipped design decisions over inventing something novel from scratch.
+
+- When a clarifying question in any phase reduces to "should this work like Claude Code does," the answer defaults to **yes**. Don't pose it as an open question — explain what Claude Code actually does (the mechanism and the tradeoff it encodes) as established fact, then only ask about what's specific to Carrot's constraints (e.g. no existing token-counting infra, single-session, no concurrent users) or has no clear Claude Code precedent.
+- In Phase 2, the recommended option for each key decision should be Claude Code's approach unless Carrot's constraints give a concrete reason to diverge — state that reason explicitly when it applies.
+
 ## Phases
 
 Work through three phases in order. Never skip ahead or combine phases. Always get explicit sign-off before moving to the next phase.
