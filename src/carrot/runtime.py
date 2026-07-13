@@ -3,6 +3,7 @@ import uuid
 from pathlib import Path
 
 from .client import OpenAICompatibleClient
+from .context_governor import ContextGovernor
 from .log import logger
 from .memory import Memory
 from .memory import current as current_memory
@@ -24,6 +25,8 @@ class Runtime:
         self.system_prompt_prefix = system_prompt_prefix
         self.messages = messages
         self.session_id = session_id
+        self.context_governor = ContextGovernor(client)
+        self.usage = None
 
     @classmethod
     def build(
@@ -59,6 +62,8 @@ class Runtime:
         logger.debug("User ask:\n%s", user_input)
 
         while True:
+            self.context_governor.govern(self.messages, self.usage)
+
             mem = current_memory()
 
             memory_snapshot = mem.render()
@@ -74,6 +79,11 @@ class Runtime:
             for chunk in self.client.respond_stream(
                 self.messages, tools=toolbox.get_openai_schema()
             ):
+                if chunk.usage:
+                    self.usage = chunk.usage
+                    logger.debug("Turn usage: %s", self.usage)
+                    continue
+
                 delta = chunk.choices[0].delta
 
                 if delta.content:
@@ -96,16 +106,13 @@ class Runtime:
 
             tool_calls = [tc for a in tool_call_accums.values() if (tc := a.finalize())]
 
+            assistant_message = {"role": "assistant", "content": content or None}
+            if tool_calls:
+                assistant_message["tool_calls"] = [tc.to_openai_format() for tc in tool_calls]
+            self.messages.append(assistant_message)
+
             if not tool_calls:
                 return content
-
-            self.messages.append(
-                {
-                    "role": "assistant",
-                    "content": content or None,
-                    "tool_calls": [tc.to_openai_format() for tc in tool_calls],
-                }
-            )
 
             for tc in tool_calls:
                 result = toolbox.execute(tc.name, tc.arguments)
