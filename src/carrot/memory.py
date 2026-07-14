@@ -1,6 +1,9 @@
 from dataclasses import dataclass, field
 from pathlib import Path
+import json
 
+def project_slug(project_root: Path) -> str:
+    return str(project_root.resolve()).replace("/", "-")
 
 @dataclass
 class EpisodicNote:
@@ -20,11 +23,19 @@ class Memory:
 
     @classmethod
     def build(cls, project_root: Path, session_id: str):
-        project_slug = str(project_root.resolve()).replace("/", "-")
-        memory_dir = Path.home() / ".carrot" / "projects" / project_slug / "memory" / session_id
+        slug = project_slug(project_root)
+        memory_dir = Path.home() / ".carrot" / "projects" / slug / "memory" / session_id
         (memory_dir / "notes").mkdir(parents=True, exist_ok=True)
+
+        index_path = memory_dir / "index.json"
+        notes = [EpisodicNote(**n) for n in json.loads(index_path.read_text())] if index_path.exists() else []
+
+        summary_path = memory_dir / "task_summary.txt"
+        summary = summary_path.read_text() if summary_path.exists() else ""
+
         return cls(
-            project_slug=project_slug, session_id=session_id, memory_dir=memory_dir, task_summary=""
+            project_slug=slug, session_id=session_id, memory_dir=memory_dir,
+            task_summary=summary, episodic_notes=notes,
         )
 
     def render(self) -> str:

@@ -14,5 +14,7 @@ from . import tool
     },
 )
 def update_task_summary(content: str):
-    memory.current().task_summary = content
+    mem = memory.current()
+    mem.task_summary = content
+    (mem.memory_dir / "task_summary.txt").write_text(content)
     return "Task summary updated."
