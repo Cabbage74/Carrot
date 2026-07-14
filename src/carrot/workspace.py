@@ -124,3 +124,16 @@ class WorkspaceContext:
             lines.append("  - none")
 
         return "\n".join(lines)
+
+
+_current: "WorkspaceContext | None" = None
+
+
+def set_current(ctx: "WorkspaceContext") -> None:
+    global _current
+    _current = ctx
+
+
+def current() -> "WorkspaceContext":
+    assert _current is not None, "WorkspaceContext not initialized"
+    return _current

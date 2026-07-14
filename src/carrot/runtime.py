@@ -3,6 +3,7 @@ import time
 import uuid
 from pathlib import Path
 
+from . import permissions, sandbox, workspace
 from .client import OpenAICompatibleClient
 from .context_governor import ContextGovernor
 from .log import logger
@@ -11,6 +12,7 @@ from .memory import current as current_memory
 from .memory import set_current as set_current_memory
 from .message import StreamingToolCallAccumulator
 from .tools import toolbox
+from .tools.bash_exec import run_bash
 from .workspace import WorkspaceContext
 from .checkpoint import EventLog, SessionMeta, build_report, replay
 
@@ -25,6 +27,11 @@ INTERRUPTED_TOOL_RESULT = (
     "already executed. This tool can have side effects; verify its actual effect first "
     "(e.g. check the file or command output) before deciding whether to redo it."
 )
+DENIED_ON_RESUME_RESULT = (
+    "Error: denied. This call required user approval before executing, but the session "
+    "was interrupted while waiting for a response, so it was never run. Request it again "
+    "if it's still needed."
+)
 
 class Runtime:
     def __init__(self, client, workspace_context, system_prompt_prefix, messages, session_id, event_log, meta, meta_path):
@@ -38,6 +45,7 @@ class Runtime:
         self.meta_path = meta_path
         self.context_governor = ContextGovernor(client)
         self.usage = None
+        self.pending_confirmation_ids: set[str] = set()
 
     @classmethod
     def build(
@@ -47,6 +55,7 @@ class Runtime:
         system_prompt_prefix: str,
     ):
         session_id = uuid.uuid4().hex[:12]
+        workspace.set_current(workspace_context)
 
         system_prompt = system_prompt_prefix + "\n\n"
         system_prompt += workspace_context.text()
@@ -76,6 +85,7 @@ class Runtime:
 
     @classmethod
     def resume(cls, client, workspace_context, system_prompt_prefix, session_id):
+        workspace.set_current(workspace_context)
         system_prompt = system_prompt_prefix + "\n\n" + workspace_context.text()
 
         mem = Memory.build(Path(workspace_context.repo_root), session_id=session_id)
@@ -84,7 +94,7 @@ class Runtime:
         meta_path = mem.memory_dir / "meta.json"
         meta = SessionMeta.load_or_create(meta_path, session_id, str(workspace_context.repo_root))
         events_path = mem.memory_dir / "events.jsonl"
-        messages, pending_run_id = replay(events_path)
+        messages, pending_run_id, pending_confirmation_ids = replay(events_path)
         # replay() returns messages[0]/[1] as empty placeholders (so context_mutation
         # events, whose indices were recorded against the live 2-header layout, apply
         # cleanly) — fill them with the real system prompt / memory snapshot now.
@@ -101,6 +111,7 @@ class Runtime:
             meta=meta,
             meta_path=meta_path,
         )
+        runtime.pending_confirmation_ids = pending_confirmation_ids
 
         if pending_run_id:
             runtime.continue_run(pending_run_id)
@@ -135,11 +146,17 @@ class Runtime:
             for tc in last["tool_calls"]:
                 if tc["id"] in done_ids:
                     continue
-                # don't blindly re-run it — we can't tell if it already executed before the
-                # crash, so let the model decide, after checking for itself.
-                self.messages.append({"role": "tool", "tool_call_id": tc["id"], "content": INTERRUPTED_TOOL_RESULT})
+                if tc["id"] in self.pending_confirmation_ids:
+                    # it never executed — we were still blocked on the user's answer
+                    # when the crash happened, so "denied" is a fact, not a guess.
+                    content = DENIED_ON_RESUME_RESULT
+                else:
+                    # don't blindly re-run it — we can't tell if it already executed
+                    # before the crash, so let the model decide, after checking for itself.
+                    content = INTERRUPTED_TOOL_RESULT
+                self.messages.append({"role": "tool", "tool_call_id": tc["id"], "content": content})
                 self.event_log.append("tool_result", run_id, tool_call_id=tc["id"],
-                                       tool_name=tc["function"]["name"], content=INTERRUPTED_TOOL_RESULT)
+                                       tool_name=tc["function"]["name"], content=content)
 
         return self._loop(run_id)
 
@@ -155,6 +172,33 @@ class Runtime:
         (reports_dir / f"{run_id}.json").write_text(json.dumps(report, indent=2))
 
         return content
+
+    def _require_approval(self, tc, reason: str, run_id: str) -> bool:
+        workspace_root = self.workspace_context.repo_root
+        rule = permissions.lookup_rule(tc.name, reason, workspace_root)
+        if rule is not None:
+            return rule
+        # log before the blocking prompt so a crash mid-prompt is provably
+        # "never executed", not merely "unknown" — see continue_run().
+        self.event_log.append("awaiting_confirmation", run_id, tool_call_id=tc.id,
+                               tool_name=tc.name, reason=reason)
+        return permissions.ask_user(tc.name, tc.arguments, reason, workspace_root)
+
+    def _execute_tool_call(self, tc, run_id: str) -> str:
+        workspace_root = self.workspace_context.repo_root
+
+        reason = permissions.classify(tc.name, tc.arguments, workspace_root)
+        if reason is not None and not self._require_approval(tc, reason, run_id):
+            return f"Error: denied by user — {tc.name} requires approval ({reason})."
+
+        result = toolbox.execute(tc.name, tc.arguments)
+
+        if tc.name == "bash_exec" and sandbox.looks_like_network_failure(result):
+            if self._require_approval(tc, "network_escape", run_id):
+                result = run_bash(tc.arguments["command"], tc.arguments.get("timeout", 120),
+                                   allow_network=True)
+
+        return result
 
     def _loop(self, run_id: str) -> str:
         while True:
@@ -217,7 +261,7 @@ class Runtime:
                 return self._finish_run(run_id, content)
 
             for tc in tool_calls:
-                result = toolbox.execute(tc.name, tc.arguments)
+                result = self._execute_tool_call(tc, run_id)
                 logger.debug("Tool %s Executed with args: %s", tc.name, json.dumps(tc.arguments))
 
                 self.messages.append({"role": "tool", "tool_call_id": tc.id, "content": result})

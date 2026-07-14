@@ -49,16 +49,17 @@ def _apply_mutation(messages: list[dict], mutation: dict) -> None:
             messages[cleared["index"]]["content"] = cleared["content"]
 
 
-def replay(events_path: Path) -> tuple[list[dict], str | None]:
+def replay(events_path: Path) -> tuple[list[dict], str | None, set[str]]:
     # indices 0/1 are placeholders for the two leading system messages (system
     # prompt + memory snapshot) that Runtime.resume() overwrites afterward — kept
     # here so context_mutation events, whose indices were recorded against the
     # live self.messages (which always starts with those two slots), line up.
     messages: list[dict] = [{"role": "system", "content": ""}, {"role": "system", "content": ""}]
     if not events_path.exists():
-        return messages, None
+        return messages, None, set()
 
     last_run_id, run_closed = None, True
+    awaiting_confirmation: set[str] = set()
     for line in events_path.read_text().splitlines():
         event = json.loads(line)
         last_run_id = event["run_id"]
@@ -67,13 +68,16 @@ def replay(events_path: Path) -> tuple[list[dict], str | None]:
             run_closed = False
         elif event["type"] == "assistant_message":
             messages.append(event["message"])
+        elif event["type"] == "awaiting_confirmation":
+            awaiting_confirmation.add(event["tool_call_id"])
         elif event["type"] == "tool_result":
             messages.append({"role": "tool", "tool_call_id": event["tool_call_id"], "content": event["content"]})
+            awaiting_confirmation.discard(event["tool_call_id"])
         elif event["type"] == "context_mutation":
             _apply_mutation(messages, event["mutation"])
         elif event["type"] == "run_end":
             run_closed = True
-    return messages, (None if run_closed else last_run_id)
+    return messages, (None if run_closed else last_run_id), awaiting_confirmation
 
 
 def build_report(events_path: Path, run_id: str) -> dict:

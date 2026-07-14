@@ -26,3 +26,5 @@ log.log
 
 # Claude Code 本地配置（每台机器不同）
 .claude/settings.json
+
+/ref/*
