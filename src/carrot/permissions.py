@@ -74,7 +74,8 @@ def describe_request(tool_name: str, arguments: dict, reason: str) -> str:
 
 
 def ask_user(tool_name: str, arguments: dict, reason: str, workspace_root: str) -> bool:
-    print(f"\n[permission] {describe_request(tool_name, arguments, reason)}")
+    from . import tui
+    tui.render_permission_request(describe_request(tool_name, arguments, reason))
     while True:
         answer = input("Allow? [y]es / [n]o / [a]lways allow / [d]eny always: ").strip().lower()
         if answer in ("y", "yes"):

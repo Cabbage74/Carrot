@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from . import tui
 from .checkpoint import list_sessions
 from .client import OpenAICompatibleClient
 from .memory import project_slug
@@ -16,20 +17,15 @@ def choose_runtime(client, workspace_context):
     if not sessions:
         return Runtime.build(client, workspace_context, system_prompt_prefix=system_prompt_prefix)
 
-    print("Existing sessions:")
-    print("  [n] start a new session")
-    for i, s in enumerate(sessions):
-        flag = " (crashed mid-run)" if s.status == "in_run" else ""
-        print(f"  [{i}] {s.first_input[:60]}{flag}")
-
-    choice = input("> ").strip()
-    if choice == "n" or not choice:
+    action = tui.session_menu(sessions, memory_root)
+    if action[0] == "quit":
+        return None
+    if action[0] == "new":
         return Runtime.build(client, workspace_context, system_prompt_prefix=system_prompt_prefix)
 
-    session_id = sessions[int(choice)].session_id
     return Runtime.resume(
         client, workspace_context,
-        system_prompt_prefix=system_prompt_prefix, session_id=session_id,
+        system_prompt_prefix=system_prompt_prefix, session_id=action[1],
     )
 
 def main():
@@ -37,11 +33,13 @@ def main():
     workspace_context = WorkspaceContext.build()
 
     runtime = choose_runtime(client, workspace_context)
+    if runtime is None:
+        return
 
-    print("Carrot REPL — /exit to quit\n")
+    tui.banner()
     while True:
         try:
-            user_input = input("> ").strip()
+            user_input = tui.prompt_line("> ").strip()
         except (EOFError, KeyboardInterrupt):
             print("\nBye!")
             break

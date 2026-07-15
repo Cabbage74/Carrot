@@ -1,4 +1,5 @@
 import json
+import shutil
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -42,6 +43,11 @@ def list_sessions(project_memory_root: Path) -> list[SessionMeta]:
         for p in project_memory_root.glob("*/meta.json")
     )
     return sorted(metas, key=lambda m: m.last_active_at, reverse=True)
+
+
+def delete_session(project_memory_root: Path, session_id: str) -> None:
+    """Remove a session's entire directory (events, meta, notes, run reports)."""
+    shutil.rmtree(project_memory_root / session_id, ignore_errors=True)
 
 
 def _apply_mutation(messages: list[dict], mutation: dict) -> None:

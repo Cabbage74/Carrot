@@ -1,6 +1,6 @@
 import json
 
-from carrot.checkpoint import replay
+from carrot.checkpoint import SessionMeta, delete_session, list_sessions, replay
 
 
 def _write_events(path, events):
@@ -126,3 +126,30 @@ def _event_asst(run_id, tc_id):
 def _event_tool(run_id, tc_id):
     return {"type": "tool_result", "run_id": run_id, "tool_call_id": tc_id,
             "tool_name": "read_file", "content": "output of " + tc_id}
+
+
+def _make_session(memory_root, session_id, first_input):
+    session_dir = memory_root / session_id
+    (session_dir / "notes").mkdir(parents=True)
+    meta = SessionMeta(session_id=session_id, project_root="/proj",
+                       created_at=1.0, last_active_at=1.0, first_input=first_input)
+    meta.save(session_dir / "meta.json")
+    return session_dir
+
+
+def test_delete_session_removes_directory(tmp_path):
+    keep = _make_session(tmp_path, "keep123", "keep me")
+    doomed = _make_session(tmp_path, "gone456", "delete me")
+    assert {m.session_id for m in list_sessions(tmp_path)} == {"keep123", "gone456"}
+
+    delete_session(tmp_path, "gone456")
+
+    assert not doomed.exists()
+    assert keep.exists()
+    assert {m.session_id for m in list_sessions(tmp_path)} == {"keep123"}
+
+
+def test_delete_session_is_noop_for_missing_id(tmp_path):
+    _make_session(tmp_path, "keep123", "keep me")
+    delete_session(tmp_path, "never_existed")  # must not raise
+    assert {m.session_id for m in list_sessions(tmp_path)} == {"keep123"}

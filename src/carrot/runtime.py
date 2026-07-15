@@ -3,7 +3,7 @@ import time
 import uuid
 from pathlib import Path
 
-from . import permissions, sandbox, workspace
+from . import permissions, sandbox, tui, workspace
 from .checkpoint import EventLog, SessionMeta, build_report, replay
 from .client import OpenAICompatibleClient
 from .context_governor import ContextGovernor
@@ -222,33 +222,34 @@ class Runtime:
 
             content = ""
             tool_call_accums: dict[int, StreamingToolCallAccumulator] = {}
-            for chunk in self.client.respond_stream(
-                self.messages, tools=toolbox.get_openai_schema()
-            ):
-                if chunk.usage:
-                    self.usage = chunk.usage
-                    logger.debug("Turn usage: %s", self.usage)
-                    continue
+            with tui.assistant_stream() as stream:
+                for chunk in self.client.respond_stream(
+                    self.messages, tools=toolbox.get_openai_schema()
+                ):
+                    if chunk.usage:
+                        self.usage = chunk.usage
+                        logger.debug("Turn usage: %s", self.usage)
+                        continue
 
-                delta = chunk.choices[0].delta
+                    delta = chunk.choices[0].delta
 
-                if delta.content:
-                    print(delta.content, end="", flush=True)
-                    content += delta.content
+                    if delta.content:
+                        stream.feed(delta.content)
+                        content += delta.content
 
-                if delta.tool_calls:
-                    for tc_delta in delta.tool_calls:
-                        idx = tc_delta.index
-                        if idx not in tool_call_accums:
-                            tool_call_accums[idx] = StreamingToolCallAccumulator(index=idx)
-                        acc = tool_call_accums[idx]
-                        if tc_delta.id:
-                            acc.id = tc_delta.id
-                        if tc_delta.function:
-                            if tc_delta.function.name:
-                                acc.name = tc_delta.function.name
-                            if tc_delta.function.arguments:
-                                acc.arguments += tc_delta.function.arguments
+                    if delta.tool_calls:
+                        for tc_delta in delta.tool_calls:
+                            idx = tc_delta.index
+                            if idx not in tool_call_accums:
+                                tool_call_accums[idx] = StreamingToolCallAccumulator(index=idx)
+                            acc = tool_call_accums[idx]
+                            if tc_delta.id:
+                                acc.id = tc_delta.id
+                            if tc_delta.function:
+                                if tc_delta.function.name:
+                                    acc.name = tc_delta.function.name
+                                if tc_delta.function.arguments:
+                                    acc.arguments += tc_delta.function.arguments
 
             tool_calls = [tc for a in tool_call_accums.values() if (tc := a.finalize())]
 
@@ -265,6 +266,7 @@ class Runtime:
                 return self._finish_run(run_id, content)
 
             for tc in tool_calls:
+                tui.tool_activity(tc.name)
                 result = self._execute_tool_call(tc, run_id)
                 logger.debug("Tool %s Executed with args: %s", tc.name, json.dumps(tc.arguments))
 
