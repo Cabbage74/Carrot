@@ -1,9 +1,13 @@
 import os
+from pathlib import Path
 
 from dotenv import load_dotenv
 from openai import NOT_GIVEN, OpenAI
 
-load_dotenv()
+# ~/.carrot/.env is the global default (carrot is a console script, run from any
+# directory); a .env in the current directory overrides it per-project.
+load_dotenv(Path.cwd() / ".env")
+load_dotenv(Path.home() / ".carrot" / ".env", override=False)
 
 
 class OpenAICompatibleClient:

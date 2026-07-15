@@ -9,6 +9,9 @@ dependencies = [
     "python-dotenv>=1.2.2",
 ]
 
+[project.scripts]
+carrot = "carrot.main:main"
+
 [dependency-groups]
 dev = [
     "pytest>=9.1.1",
@@ -24,3 +27,7 @@ select = ["E", "F", "I", "N", "W", "UP"]
 
 [tool.uv]
 package = true
+
+[tool.pytest.ini_options]
+pythonpath = ["src", "."]
+testpaths = ["tests"]
