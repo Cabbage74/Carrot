@@ -7,8 +7,8 @@ logging.basicConfig(
     level=logging.CRITICAL,
     format="%(asctime)s [%(levelname)s]: %(message)s",
     filename=PROJECT_ROOT / "log.log",
-    filemode="w",
-)
+    filemode="a",  # append: a session can span multiple process runs (resume) —
+)                  # wiping on each start would break cross-run log correlation.
 logging.getLogger("carrot").setLevel(logging.DEBUG)
 
 

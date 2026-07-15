@@ -7,8 +7,10 @@ from .prompts import system_prompt_prefix
 from .runtime import Runtime
 from .workspace import WorkspaceContext
 
+
 def choose_runtime(client, workspace_context):
-    memory_root = Path.home() / ".carrot" / "projects" / project_slug(Path(workspace_context.repo_root)) / "memory"
+    slug = project_slug(Path(workspace_context.repo_root))
+    memory_root = Path.home() / ".carrot" / "projects" / slug / "memory"
     sessions = list_sessions(memory_root)
 
     if not sessions:
@@ -25,7 +27,10 @@ def choose_runtime(client, workspace_context):
         return Runtime.build(client, workspace_context, system_prompt_prefix=system_prompt_prefix)
 
     session_id = sessions[int(choice)].session_id
-    return Runtime.resume(client, workspace_context, system_prompt_prefix=system_prompt_prefix, session_id=session_id)
+    return Runtime.resume(
+        client, workspace_context,
+        system_prompt_prefix=system_prompt_prefix, session_id=session_id,
+    )
 
 def main():
     client = OpenAICompatibleClient()

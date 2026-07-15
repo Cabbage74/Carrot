@@ -4,6 +4,7 @@ import uuid
 from pathlib import Path
 
 from . import permissions, sandbox, workspace
+from .checkpoint import EventLog, SessionMeta, build_report, replay
 from .client import OpenAICompatibleClient
 from .context_governor import ContextGovernor
 from .log import logger
@@ -14,8 +15,6 @@ from .message import StreamingToolCallAccumulator
 from .tools import toolbox
 from .tools.bash_exec import run_bash
 from .workspace import WorkspaceContext
-from .checkpoint import EventLog, SessionMeta, build_report, replay
-
 
 REMINDER_THRESHOLD = 5
 REMINDER_TEXT = (
@@ -34,7 +33,8 @@ DENIED_ON_RESUME_RESULT = (
 )
 
 class Runtime:
-    def __init__(self, client, workspace_context, system_prompt_prefix, messages, session_id, event_log, meta, meta_path):
+    def __init__(self, client, workspace_context, system_prompt_prefix, messages,
+                 session_id, event_log, meta, meta_path):
         self.client = client
         self.workspace_context = workspace_context
         self.system_prompt_prefix = system_prompt_prefix
@@ -214,6 +214,10 @@ class Runtime:
 
             if mem.tool_calls_since_update >= REMINDER_THRESHOLD:
                 self.messages.append({"role": "system", "content": REMINDER_TEXT})
+                # Log it: this appends a message to self.messages, so any later
+                # context_mutation records indices against a list that includes
+                # it. replay() must reconstruct it too or those indices misalign.
+                self.event_log.append("reminder", run_id, content=REMINDER_TEXT)
                 mem.tool_calls_since_update = 0
 
             content = ""
@@ -265,7 +269,8 @@ class Runtime:
                 logger.debug("Tool %s Executed with args: %s", tc.name, json.dumps(tc.arguments))
 
                 self.messages.append({"role": "tool", "tool_call_id": tc.id, "content": result})
-                self.event_log.append("tool_result", run_id, tool_call_id=tc.id, tool_name=tc.name, content=result)
+                self.event_log.append("tool_result", run_id, tool_call_id=tc.id,
+                                      tool_name=tc.name, content=result)
                 logger.debug("Tool %s Result:\n%s", tc.name, result)
 
                 if tc.name in ("update_task_summary", "write_episodic_note"):

@@ -1,6 +1,6 @@
-from dataclasses import asdict, dataclass
 import json
 import time
+from dataclasses import asdict, dataclass
 from pathlib import Path
 
 FILE_ARG_TOOLS = {"write_file", "edit_file", "read_file"}
@@ -37,7 +37,10 @@ class SessionMeta:
 
 
 def list_sessions(project_memory_root: Path) -> list[SessionMeta]:
-    metas = (SessionMeta(**json.loads(p.read_text())) for p in project_memory_root.glob("*/meta.json"))
+    metas = (
+        SessionMeta(**json.loads(p.read_text()))
+        for p in project_memory_root.glob("*/meta.json")
+    )
     return sorted(metas, key=lambda m: m.last_active_at, reverse=True)
 
 
@@ -68,10 +71,15 @@ def replay(events_path: Path) -> tuple[list[dict], str | None, set[str]]:
             run_closed = False
         elif event["type"] == "assistant_message":
             messages.append(event["message"])
+        elif event["type"] == "reminder":
+            # Mirror runtime's in-loop memory-write nudge so message indices line
+            # up with any context_mutation recorded after it (see runtime._loop).
+            messages.append({"role": "system", "content": event["content"]})
         elif event["type"] == "awaiting_confirmation":
             awaiting_confirmation.add(event["tool_call_id"])
         elif event["type"] == "tool_result":
-            messages.append({"role": "tool", "tool_call_id": event["tool_call_id"], "content": event["content"]})
+            messages.append({"role": "tool", "tool_call_id": event["tool_call_id"],
+                             "content": event["content"]})
             awaiting_confirmation.discard(event["tool_call_id"])
         elif event["type"] == "context_mutation":
             _apply_mutation(messages, event["mutation"])
@@ -86,6 +94,7 @@ def build_report(events_path: Path, run_id: str) -> dict:
     files_touched: set[str] = set()
     started_at = ended_at = None
     prompt_tokens = None
+    total_prompt_tokens = 0
     completion_tokens = 0
     user_input = ""
     outcome = "interrupted"
@@ -104,7 +113,12 @@ def build_report(events_path: Path, run_id: str) -> dict:
                 tool_call_meta[tc["id"]] = (tc["function"]["name"], tc["function"]["arguments"])
             usage = event.get("usage")
             if usage:
+                # Each turn re-sends the whole growing context, so real billed
+                # prompt tokens are the SUM across turns, not just the last turn.
+                # Keep both: prompt_tokens = peak single-turn context (the last
+                # turn is the largest), total_prompt_tokens = actual billed.
                 prompt_tokens = usage.get("prompt_tokens")
+                total_prompt_tokens += usage.get("prompt_tokens") or 0
                 completion_tokens += usage.get("completion_tokens") or 0
         elif event["type"] == "tool_result":
             name = event["tool_name"]
@@ -129,6 +143,8 @@ def build_report(events_path: Path, run_id: str) -> dict:
         "tool_calls": tool_counts,
         "files_touched": sorted(files_touched),
         "prompt_tokens": prompt_tokens,
+        "total_prompt_tokens": total_prompt_tokens,
         "completion_tokens": completion_tokens,
+        "billed_tokens": total_prompt_tokens + completion_tokens,
         "final_content": final_content,
     }

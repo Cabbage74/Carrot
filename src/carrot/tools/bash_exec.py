@@ -36,7 +36,7 @@ def run_bash(command: str, timeout: int, allow_network: bool) -> str:
             },
             "timeout": {
                 "type": "integer",
-                "description": "Timeout in seconds(deault 60).",
+                "description": "Timeout in seconds (default 120).",
             },
         },
         "required": ["command"],

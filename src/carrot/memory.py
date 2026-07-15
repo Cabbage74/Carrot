@@ -1,6 +1,7 @@
+import json
 from dataclasses import dataclass, field
 from pathlib import Path
-import json
+
 
 def project_slug(project_root: Path) -> str:
     return str(project_root.resolve()).replace("/", "-")
@@ -28,7 +29,10 @@ class Memory:
         (memory_dir / "notes").mkdir(parents=True, exist_ok=True)
 
         index_path = memory_dir / "index.json"
-        notes = [EpisodicNote(**n) for n in json.loads(index_path.read_text())] if index_path.exists() else []
+        notes = (
+            [EpisodicNote(**n) for n in json.loads(index_path.read_text())]
+            if index_path.exists() else []
+        )
 
         summary_path = memory_dir / "task_summary.txt"
         summary = summary_path.read_text() if summary_path.exists() else ""

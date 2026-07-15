@@ -1,4 +1,4 @@
-from .context_window import context_window_for
+from .context_window import context_window_for, estimate_tokens
 from .log import logger
 
 MICROCOMPACT_THRESHOLD = 0.70
@@ -27,18 +27,40 @@ class ContextGovernor:
         logger.debug("Context occupancy: %.1f%%", occupancy * 100)
 
         if occupancy >= COMPACT_THRESHOLD:
-            print(f"[已压缩：上下文占用 {occupancy:.0%}，总结旧对话]")
-            return self._compact(messages)
+            # Escalate: try the non-destructive path first. Clearing big old tool
+            # outputs often drops occupancy enough that we never have to summarize
+            # away raw detail — and it preserves message structure, so the model
+            # can still record anything worth keeping into memory afterward.
+            mutation = self._microcompact(messages, usage) or self._compact(messages)
+            if mutation:
+                label = "已清理旧工具输出" if mutation["type"] == "microcompact" else "已总结旧对话"
+                print(f"[上下文占用 {occupancy:.0%}，{label}]")
+            return mutation
         elif occupancy >= MICROCOMPACT_THRESHOLD:
-            print(f"[已清理：上下文占用 {occupancy:.0%}，清空旧工具输出]")
-            return self._microcompact(messages, usage)
+            mutation = self._microcompact(messages, usage)
+            if mutation:
+                print(f"[上下文占用 {occupancy:.0%}，已清理旧工具输出]")
+            return mutation
         return None
 
     def _safe_boundary(self, messages: list[dict], preserve_turns: int) -> int | None:
-        user_indices = [i for i, m in enumerate(messages) if m["role"] == "user"]
-        if len(user_indices) <= preserve_turns:
-            return None
-        return user_indices[-preserve_turns]
+        # A safe cut lands on a message that can legally start the preserved tail:
+        # a user message, or an assistant message (whose tool results, if any, are
+        # preserved right after it). Never a bare tool result — that would orphan
+        # it from the assistant tool_call now folded into the summary.
+        user_cuts = [i for i, m in enumerate(messages) if m["role"] == "user"]
+        if len(user_cuts) > preserve_turns:
+            return user_cuts[-preserve_turns]
+
+        # A single user request can span dozens of assistant/tool round-trips with
+        # no new user message — the primary workload for this agent. Fall back to
+        # assistant round-trip boundaries so long single-turn sessions stay
+        # compactable instead of climbing to 100% occupancy untouched.
+        asst_cuts = [i for i, m in enumerate(messages) if m["role"] == "assistant"]
+        if len(asst_cuts) > preserve_turns:
+            return asst_cuts[-preserve_turns]
+
+        return None
 
     def _compact(self, messages: list[dict], focus: str | None = None) -> dict | None:
         boundary = self._safe_boundary(messages, PRESERVE_TURNS)
@@ -55,7 +77,9 @@ class ContextGovernor:
 
         summary = "".join(
             chunk.choices[0].delta.content or ""
-            for chunk in self.client.respond_stream([{"role": "system", "content": prompt}, *to_summarize])
+            for chunk in self.client.respond_stream(
+                [{"role": "system", "content": prompt}, *to_summarize]
+            )
             if chunk.choices
         )
         logger.debug("Compact summary (%d chars):\n%s", len(summary), summary)
@@ -86,9 +110,9 @@ class ContextGovernor:
         for i, m in candidates:
             if freed >= tokens_to_free:
                 break
-            original_len = len(m["content"])
-            messages[i]["content"] = f"{CLEARED_MARKER}, was {original_len} chars]"
-            freed += original_len // 4
+            original = m["content"]
+            messages[i]["content"] = f"{CLEARED_MARKER}, was {len(original)} chars]"
+            freed += estimate_tokens(original)
             cleared.append({"index": i, "content": messages[i]["content"]})
 
         logger.debug(

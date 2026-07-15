@@ -26,6 +26,10 @@ is non-deterministic across model versions.
 - Metrics (tokens, tool-call counts, duration, outcome) come straight from the
   run report `Runtime` already writes to `<memory_dir>/runs/<run_id>.json`
   (`carrot.checkpoint.build_report`) — the harness doesn't re-derive them.
+- The reported `billed_tok` is the *true* API cost: every turn re-sends the
+  whole growing context, so it sums each turn's prompt tokens (not just the
+  final turn's) plus all completion tokens. The report also keeps
+  `prompt_tokens` separately as the single-turn context peak.
 - `--runs N` repeats a task N times to compute pass@N alongside the raw pass
   rate, since a single run can pass or fail by luck.
 - Mutating tools (`bash_exec`, `write_file`, `edit_file`) are pre-approved for

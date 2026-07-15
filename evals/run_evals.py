@@ -54,19 +54,30 @@ def _run_once(client, task, run_index: int) -> dict:
         "detail": detail,
         "tool_calls": report.get("tool_calls") or {},
         "prompt_tokens": report.get("prompt_tokens"),
+        "total_prompt_tokens": report.get("total_prompt_tokens"),
         "completion_tokens": report.get("completion_tokens"),
+        "billed_tokens": report.get("billed_tokens"),
         "duration_seconds": report.get("duration_seconds") or elapsed,
     }
 
 
+def _billed(r: dict) -> int:
+    # True API cost = sum of every turn's prompt (context is re-sent each turn)
+    # plus all completions. Falls back to peak-context accounting for reports
+    # written before total_prompt_tokens existed.
+    prompt = r.get("total_prompt_tokens")
+    if prompt is None:
+        prompt = r.get("prompt_tokens") or 0
+    return prompt + (r["completion_tokens"] or 0)
+
+
 def _print_table(records: list[dict]) -> None:
-    print(f"{'task':<22}{'run':<5}{'pass':<6}{'tools':<8}{'tokens':<10}{'dur(s)':<8}")
+    print(f"{'task':<22}{'run':<5}{'pass':<6}{'tools':<8}{'billed_tok':<12}{'dur(s)':<8}")
     for r in records:
         tools = sum(r["tool_calls"].values()) if r["tool_calls"] else 0
-        tokens = (r["prompt_tokens"] or 0) + (r["completion_tokens"] or 0)
         print(
             f"{r['task']:<22}{r['run']:<5}{'yes' if r['passed'] else 'no':<6}"
-            f"{tools:<8}{tokens:<10}{r['duration_seconds']:.1f}"
+            f"{tools:<8}{_billed(r):<12}{r['duration_seconds']:.1f}"
         )
 
 
@@ -80,11 +91,13 @@ def _print_summary(records: list[dict], task_ids: list[str]) -> None:
         pass_at_k = any(r["passed"] for r in task_records)
         print(f"{task_id}: pass_rate={pass_rate:.0%} pass@{len(task_records)}={pass_at_k}")
 
-    total_tokens = sum(
-        (r["prompt_tokens"] or 0) + (r["completion_tokens"] or 0) for r in records
-    )
+    total_billed = sum(_billed(r) for r in records)
+    avg_billed = total_billed / len(records) if records else 0
     overall = sum(r["passed"] for r in records) / len(records) if records else 0
-    print(f"overall pass_rate={overall:.0%} total_tokens={total_tokens}")
+    print(
+        f"overall pass_rate={overall:.0%} "
+        f"billed_tokens total={total_billed} avg_per_run={avg_billed:.0f}"
+    )
 
 
 def self_test() -> int:
