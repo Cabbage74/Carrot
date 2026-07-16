@@ -19,11 +19,25 @@ project) — a local `.env` always wins over the global one.
 ## Run it
 
 ```bash
-carrot
+carrot          # default: bash runs unsandboxed
+carrot -safe    # opt-in: run bash inside a bwrap sandbox (Linux + bubblewrap)
 ```
 
 For local development inside this repo, `uv run python -m carrot` also works
 without installing anything.
+
+### Sandboxing (`-safe`)
+
+By default `bash_exec` runs commands directly. Every side-effecting call still
+needs approval and file access is still confined to the workspace — those checks
+are OS-independent and always on.
+
+Passing `-safe` additionally runs `bash_exec` inside a
+[bubblewrap](https://github.com/containers/bubblewrap) sandbox: the workspace is
+read-write, the rest of the host is read-only, and the network is cut unless a
+command is approved for it. This requires `bwrap` on the `PATH` (Linux only). If
+`-safe` is requested where bubblewrap isn't available, Carrot prints a warning
+and exits so you can install it or drop the flag.
 
 ## Evaluation & audit
 

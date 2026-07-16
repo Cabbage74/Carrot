@@ -192,6 +192,11 @@ def render_permission_request(description: str) -> None:
                         border_style="yellow", expand=False))
 
 
+def warn(message: str) -> None:
+    console.print(Panel(message, title="[bold red]warning[/]",
+                        border_style="red", expand=False))
+
+
 # --- assistant output streaming -------------------------------------------
 
 class _AssistantStream:

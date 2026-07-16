@@ -193,7 +193,11 @@ class Runtime:
 
         result = toolbox.execute(tc.name, tc.arguments)
 
-        if tc.name == "bash_exec" and sandbox.looks_like_network_failure(result):
+        if (
+            tc.name == "bash_exec"
+            and sandbox.enabled()
+            and sandbox.looks_like_network_failure(result)
+        ):
             if self._require_approval(tc, "network_escape", run_id):
                 result = run_bash(tc.arguments["command"], tc.arguments.get("timeout", 120),
                                    allow_network=True)

@@ -1,12 +1,38 @@
+import argparse
 from pathlib import Path
 
-from . import tui
+from . import sandbox, tui
 from .checkpoint import list_sessions
 from .client import OpenAICompatibleClient
 from .memory import project_slug
 from .prompts import system_prompt_prefix
 from .runtime import Runtime
 from .workspace import WorkspaceContext
+
+
+def parse_args(argv=None):
+    parser = argparse.ArgumentParser(prog="carrot", description="A coding agent")
+    parser.add_argument(
+        "-safe", "--safe",
+        dest="safe",
+        action="store_true",
+        help="Run bash_exec inside a bwrap sandbox (requires bubblewrap on Linux).",
+    )
+    return parser.parse_args(argv)
+
+
+def configure_sandbox(safe: bool) -> None:
+    if not safe:
+        sandbox.set_enabled(False)
+        return
+    if not sandbox.bubblewrap_available():
+        tui.warn(
+            "-safe was requested but bubblewrap (bwrap) was not found. "
+            "The sandbox requires bubblewrap on Linux. Install it "
+            "(e.g. `sudo apt-get install bubblewrap`) or run without -safe. Exiting."
+        )
+        raise SystemExit(1)
+    sandbox.set_enabled(True)
 
 
 def choose_runtime(client, workspace_context):
@@ -29,6 +55,11 @@ def choose_runtime(client, workspace_context):
     )
 
 def main():
+    args = parse_args()
+    # Must run before choose_runtime: resume can trigger continue_run -> tool
+    # execution, so the sandbox toggle has to be set first.
+    configure_sandbox(args.safe)
+
     client = OpenAICompatibleClient()
     workspace_context = WorkspaceContext.build()
 
@@ -37,6 +68,8 @@ def main():
         return
 
     tui.banner()
+    if sandbox.enabled():
+        tui.console.print("[dim]🔒 sandbox enabled (bwrap) — bash runs network-isolated[/dim]\n")
     while True:
         try:
             user_input = tui.prompt_line("> ").strip()

@@ -1,6 +1,21 @@
 import shutil
 import subprocess
 
+# Whether bash_exec routes through the bwrap sandbox. Off by default — enabled
+# explicitly via `carrot -safe` (see main.configure_sandbox). Mirrors the
+# module-singleton pattern used by memory.py / workspace.py.
+_enabled = False
+
+
+def set_enabled(value: bool) -> None:
+    global _enabled
+    _enabled = value
+
+
+def enabled() -> bool:
+    return _enabled
+
+
 NETWORK_ERROR_MARKERS = (
     "could not resolve host",
     "connection refused",
@@ -51,3 +66,19 @@ def run_sandboxed(
         )
     argv = build_bwrap_argv(command, workspace_root, allow_network)
     return subprocess.run(argv, capture_output=True, text=True, timeout=timeout)
+
+
+def run_unsandboxed(
+    command: str, workspace_root: str, timeout: int
+) -> subprocess.CompletedProcess:
+    # Default mode: run the command directly in the workspace with host network
+    # access. The approval gate + path confinement (permissions.py) still apply,
+    # so this is not "no safety" — just no OS-level isolation.
+    return subprocess.run(
+        command,
+        shell=True,
+        cwd=workspace_root,
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+    )

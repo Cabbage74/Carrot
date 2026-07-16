@@ -5,10 +5,12 @@ from . import tool
 
 
 def run_bash(command: str, timeout: int, allow_network: bool) -> str:
+    workspace_root = workspace.current().repo_root
     try:
-        result = sandbox.run_sandboxed(
-            command, workspace.current().repo_root, timeout, allow_network
-        )
+        if sandbox.enabled():
+            result = sandbox.run_sandboxed(command, workspace_root, timeout, allow_network)
+        else:
+            result = sandbox.run_unsandboxed(command, workspace_root, timeout)
     except subprocess.TimeoutExpired:
         return f"Error: Command timed out after {timeout}s"
 
@@ -24,8 +26,9 @@ def run_bash(command: str, timeout: int, allow_network: bool) -> str:
     name="bash_exec",
     description=(
         "Execute a shell command and return its stdout and stderr. "
-        "Use a timeout to prevent hanging. Runs network-isolated by default; "
-        "if a command needs network access, rerun it after approval."
+        "Use a timeout to prevent hanging. When the sandbox is enabled "
+        "(carrot -safe) commands run network-isolated; rerun after approval "
+        "if a command needs network access."
     ),
     parameters={
         "type": "object",
